@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multi YouTube Player</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f5f1;--surface:#fff;--text:#1d1d1b;--muted:#6b6a65;--line:#dcdad2;--accent:#c4452d;--accent-text:#fff;--ph:#ecebe4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--surface:#222221;--text:#f0efea;--muted:#9c9a92;--line:#3a3a37;--accent:#e2644b;--accent-text:#161615;--ph:#2c2c2a}}
+:root[data-theme="dark"]{--bg:#161615;--surface:#222221;--text:#f0efea;--muted:#9c9a92;--line:#3a3a37;--accent:#e2644b;--accent-text:#161615;--ph:#2c2c2a}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans Bengali",sans-serif}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 16px}
+h1{font-size:18px;margin:0 0 10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select{padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600}
+#msg{color:var(--muted);font-size:13px;margin-top:8px;min-height:1em}
+#grid{display:grid;gap:14px;padding:16px;grid-template-columns:repeat(var(--cols,3),1fr)}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tile .top{display:flex;gap:6px;align-items:center;padding:8px}
+.tile .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-text);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.tile input{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;font-size:14px}
+.tile input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.tile .x{padding:6px 10px;font-size:13px}
+.tile .v{position:relative;aspect-ratio:16/9;background:var(--ph);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+.tile .v iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+@media (max-width:700px){#grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+<h1>▶ একসাথে ২০টি ভিডিও</h1>
+<div class="row">
+<button class="primary" id="playAll">▶ সব Play</button>
+<button id="pauseAll">⏸ সব Pause</button>
+<button id="muteAll">🔇 সব Mute</button>
+<button id="unmuteAll">🔊 সব Unmute</button>
+<button id="clear">সব মুছুন</button>
+<label style="font-size:13px;color:var(--muted)">কলাম
+<select id="cols"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+</div>
+<div id="msg">প্রতিটি ঘরে একটি করে YouTube লিংক পেস্ট করুন, তারপর উপরের "সব Play" চাপুন।</div>
+</header>
+<main id="grid"></main>
+<script>
+(function(){
+var N=20,KEY="multi-yt-slots",slots=[],tiles=[],grid=document.getElementById("grid"),msg=document.getElementById("msg");
+for(var k=0;k<N;k++)slots.push("");
+try{var s=JSON.parse(localStorage.getItem(KEY)||"[]");for(var k=0;k<N;k++)if(typeof s[k]==="string")slots[k]=s[k]}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(slots))}catch(e){}}
+function parse(t){
+  t=(t||"").trim();var m=t.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/);
+  if(m)return m[1];return /^[\w-]{11}$/.test(t)?t:"";
+}
+function cmd(f,fn){try{f.contentWindow.postMessage(JSON.stringify({event:"command",func:fn,args:[]}),"*")}catch(e){}}
+function all(fn){
+  var fr=grid.querySelectorAll("iframe");
+  if(!fr.length){msg.textContent="আগে অন্তত একটি ঘরে লিংক দিন।";return}
+  fr.forEach(function(f){cmd(f,fn)});
+  setTimeout(function(){fr.forEach(function(f){cmd(f,fn)})},600);
+  msg.textContent=fr.length+"টি ভিডিওতে কমান্ড পাঠানো হয়েছে। না চললে আবার একবার চাপুন।";
+}
+function setSlot(i,id,fromInput){
+  var t=tiles[i];if(t.id===id)return;t.id=id;slots[i]=id;save();
+  t.v.innerHTML="";
+  if(!id){t.v.textContent="ভিডিও এখানে দেখাবে";if(!fromInput)t.inp.value="";return}
+  var f=document.createElement("iframe");
+  f.src="https://www.youtube.com/embed/"+id+"?enablejsapi=1&rel=0&playsinline=1";
+  f.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";
+  f.setAttribute("allowfullscreen","");f.referrerPolicy="strict-origin-when-cross-origin";f.title="YouTube video "+(i+1);
+  f.onload=function(){try{f.contentWindow.postMessage(JSON.stringify({event:"listening"}),"*")}catch(e){}};
+  t.v.appendChild(f);if(!fromInput)t.inp.value="https://youtu.be/"+id;
+}
+for(var i=0;i<N;i++)(function(i){
+  var el=document.createElement("div");el.className="tile";
+  var top=document.createElement("div");top.className="top";
+  var n=document.createElement("span");n.className="n";n.textContent=i+1;
+  var inp=document.createElement("input");inp.type="text";inp.placeholder="লিংক পেস্ট করুন...";inp.setAttribute("aria-label","ভিডিও "+(i+1)+" লিংক");
+  var x=document.createElement("button");x.className="x";x.textContent="✕";x.title="মুছুন";
+  var v=document.createElement("div");v.className="v";
+  top.appendChild(n);top.appendChild(inp);top.appendChild(x);el.appendChild(top);el.appendChild(v);grid.appendChild(el);
+  tiles[i]={id:"",inp:inp,v:v};
+  inp.addEventListener("input",function(){var id=parse(inp.value);if(id)setSlot(i,id,true)});
+  inp.addEventListener("change",function(){var id=parse(inp.value);if(id)setSlot(i,id,true);else if(inp.value.trim())msg.textContent="ঘর "+(i+1)+": সঠিক YouTube লিংক নয়।"});
+  x.onclick=function(){setSlot(i,"",false)};
+  setSlot(i,slots[i],false);
+})(i);
+document.getElementById("playAll").onclick=function(){all("playVideo")};
+document.getElementById("pauseAll").onclick=function(){all("pauseVideo")};
+document.getElementById("muteAll").onclick=function(){all("mute")};
+document.getElementById("unmuteAll").onclick=function(){all("unMute")};
+document.getElementById("clear").onclick=function(){for(var i=0;i<N;i++)setSlot(i,"",false);msg.textContent="সব ঘর খালি করা হয়েছে।"};
+document.getElementById("cols").onchange=function(e){grid.style.setProperty("--cols",e.target.value)};
+grid.style.setProperty("--cols",3);
+})();
+</script>
+</body>
+</html>
